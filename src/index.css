@@ -1086,7 +1086,6 @@ h2.h2-sub {
 .service-content li {
   margin-bottom: 10px;
 }
-
 @media (max-width: 900px) {
   .card-grid {
     grid-template-columns: 1fr 1fr;
@@ -1098,15 +1097,48 @@ h2.h2-sub {
 }
 
 @media (max-width: 760px) {
+  .nav {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .logo-wrap {
+    width: 100%;
+    align-items: center;
+    gap: 0.9rem;
+  }
+
+  .site-logo {
+    width: 64px;
+    height: 64px;
+  }
+
+  .logo-text {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+
+  .logo-text span {
+    font-size: 0.7rem;
+  }
+
   nav.links {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem 0.8rem;
+    gap: 0.9rem 1rem;
     width: 100%;
+    align-items: center;
   }
 
   nav.links a {
-    font-size: 0.88rem;
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
+  .nav-call {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
   }
 
   .hero h1 {
@@ -1182,6 +1214,7 @@ h2.h2-sub {
     grid-column: auto;
   }
 }
+
 .taxprep-image-row {
   display: flex;
   justify-content: center;
@@ -1196,6 +1229,7 @@ h2.h2-sub {
   object-fit: cover;
   border-radius: 12px;
 }
+
 .service-content h2 {
   margin-top: 32px;
   margin-bottom: 16px;
@@ -1217,10 +1251,12 @@ h2.h2-sub {
   margin-bottom: 18px;
   line-height: 1.9;
 }
+
 .how-it-works-btn {
   margin-top: 16px;
   display: inline-block;
 }
+
 .realty-buttons {
   display: flex;
   gap: 12px;
@@ -1237,6 +1273,7 @@ h2.h2-sub {
 .btn-realty-secondary:hover {
   background: #f3e9d7;
 }
+
 .why-choose-button-wrap {
   display: flex;
   justify-content: center;
