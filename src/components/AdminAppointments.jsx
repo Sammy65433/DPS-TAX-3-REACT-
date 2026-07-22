@@ -48,6 +48,34 @@ function formatGoogleDate(dateString, timeString, durationMinutes = 60) {
 
     return `${format(start)}/${format(end)}`;
 }
+function getRealtyGoogleCalendarLink(appointment) {
+    if (!appointment.appointment_date || !appointment.appointment_time) {
+        return "#";
+    }
+
+    const dates = formatGoogleDate(
+        appointment.appointment_date,
+        appointment.appointment_time,
+        60
+    );
+
+    const text = encodeURIComponent(
+        `DPS Realty Appointment - ${appointment.first_name} ${appointment.last_name}`
+    );
+
+    const details = encodeURIComponent(
+        `Service: ${appointment.service} Phone: ${appointment.phone} Email: ${appointment.email} Message: ${appointment.message || "None"}`
+    );
+
+    const location = encodeURIComponent(
+        "DPS Realty, 1811 Springfield Ave, Maplewood, NJ 07040"
+    );
+
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${location}`;
+}
+
+
+
 
 function getGoogleCalendarLink(appointment) {
     const dates = formatGoogleDate(
@@ -103,6 +131,20 @@ function AdminAppointments() {
         message: "",
         status: "booked",
     });
+    const [editingRealtyId, setEditingRealtyId] = useState(null);
+    const [editRealtyForm, setEditRealtyForm] = useState({
+        first_name: "",
+        last_name: "",
+        phone: "",
+        email: "",
+        service: "",
+        appointment_date: "",
+        appointment_time: "",
+        message: "",
+        status: "pending",
+    });
+
+
 
     async function fetchAppointments() {
         try {
@@ -458,22 +500,116 @@ function AdminAppointments() {
                 `${appointment.first_name} ${appointment.last_name}`.toLowerCase();
 
             const searchableText = `
-        ${fullName}
-        ${appointment.email}
-        ${appointment.phone}
-        ${appointment.service}
-        ${appointment.appointment_date}
-        ${appointment.status}
-      `.toLowerCase();
+      ${fullName}
+      ${appointment.email}
+      ${appointment.phone}
+      ${appointment.service}
+      ${appointment.appointment_date}
+      ${appointment.appointment_time}
+      ${appointment.status}
+    `.toLowerCase();
 
             return searchableText.includes(searchTerm.toLowerCase());
         });
     }, [realtyAppointments, searchTerm]);
 
+
     const availableEditTimes = timeOptions.filter(time => {
         if (time === editForm.appointment_time) return true;
         return !editBookedTimes.includes(time);
     });
+    const archivedAppointments = appointments
+        .filter(appointment => appointment.status === "archived")
+        .map(appointment => ({
+            name: `${appointment.first_name} ${appointment.last_name}`,
+            email: appointment.email,
+            phone: appointment.phone,
+        }));
+
+    function startRealtyEdit(appointment) {
+        setEditingRealtyId(appointment.id);
+        setEditRealtyForm({
+            first_name: appointment.first_name || "",
+            last_name: appointment.last_name || "",
+            phone: appointment.phone || "",
+            email: appointment.email || "",
+            service: appointment.service || "",
+            appointment_date: appointment.appointment_date || "",
+            appointment_time: appointment.appointment_time || "",
+            message: appointment.message || "",
+            status: appointment.status || "pending",
+        });
+    }
+
+    function cancelRealtyEdit() {
+        setEditingRealtyId(null);
+    }
+
+    function handleRealtyEditChange(e) {
+        const { name, value } = e.target;
+        setEditRealtyForm(prev => ({ ...prev, [name]: value }));
+    }
+
+    async function handleRealtyUpdate(id) {
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/realty-appointments/${id}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(editRealtyForm),
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setStatusMessage("Realty appointment updated successfully.");
+                setStatusType("success");
+                setEditingRealtyId(null);
+                fetchAppointments();
+            } else {
+                setStatusMessage(data.message || "Could not update realty appointment.");
+                setStatusType("error");
+            }
+        } catch (error) {
+            setStatusMessage("Server error while updating realty appointment.");
+            setStatusType("error");
+        }
+    }
+
+
+    function exportArchivedJson() {
+        const dataStr = JSON.stringify(archivedAppointments, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "archived-appointments.json";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function exportArchivedCsv() {
+        const headers = ["name", "email", "phone"];
+
+
+        const rows = archivedAppointments.map(a =>
+            headers.map(header =>
+                `"${(a[header] || "").toString().replace(/"/g, '""')}"`
+            ).join(",")
+        );
+
+        const csv = [headers.join(","), ...rows].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "archived-appointments.csv";
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
 
     function formatDate(dateString) {
         if (!dateString) return "Not provided";
@@ -577,9 +713,19 @@ function AdminAppointments() {
                         <button className="btn" type="button" onClick={handleRefresh}>
                             Refresh Appointments
                         </button>
+
+                        <button className="btn" type="button" onClick={exportArchivedJson}>
+                            Export Archived JSON
+                        </button>
+
+                        <button className="btn" type="button" onClick={exportArchivedCsv}>
+                            Export Archived CSV
+                        </button>
+
                         <button className="btn" type="button" onClick={handleLogout}>
                             Logout
                         </button>
+
                     </div>
                 </div>
 
@@ -665,14 +811,16 @@ function AdminAppointments() {
                                                 name="appointment_time"
                                                 value={editForm.appointment_time}
                                                 onChange={handleEditChange}
+
                                             >
                                                 <option value="">Select Time</option>
-                                                {availableEditTimes.map(time => (
+                                                {timeOptions.map(time => (
                                                     <option key={time} value={time}>
                                                         {time}
                                                     </option>
                                                 ))}
                                             </select>
+
 
                                             <textarea
                                                 name="message"
@@ -792,15 +940,18 @@ function AdminAppointments() {
                                                 >
                                                     Delete Appointment
                                                 </button>
+                                                {appointment.appointment_date && appointment.appointment_time && (
+                                                    <a
+                                                        className="btn"
+                                                        href={getGoogleCalendarLink(appointment)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        Add to Google Calendar
+                                                    </a>
+                                                )}
 
-                                                <a
-                                                    className="btn"
-                                                    href={getGoogleCalendarLink(appointment)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    Add to Google Calendar
-                                                </a>
+
                                             </div>
                                         </>
                                     )}
@@ -818,83 +969,220 @@ function AdminAppointments() {
                         ) : (
                             filteredRealtyAppointments.map(appointment => (
                                 <div className="card" key={`realty-${appointment.id}`}>
-                                    <h3>
-                                        {appointment.first_name} {appointment.last_name}
-                                    </h3>
+                                    {editingRealtyId === appointment.id ? (
+                                        <>
+                                            <h3>Edit Realty Appointment</h3>
 
-                                    <p><strong>Service:</strong> {appointment.service}</p>
-                                    <p><strong>Date:</strong> {formatDate(appointment.appointment_date)}</p>
-                                    <p><strong>Phone:</strong> {appointment.phone}</p>
-                                    <p><strong>Email:</strong> {appointment.email}</p>
-                                    <p><strong>Message:</strong> {appointment.message || "None"}</p>
-                                    <p>
-                                        <strong>Status:</strong>{" "}
-                                        <span
-                                            style={{
-                                                color:
-                                                    appointment.status === "pending"
-                                                        ? "#7a5a14"
-                                                        : appointment.status === "confirmed"
-                                                            ? "#1d7e75"
-                                                            : appointment.status === "archived"
-                                                                ? "#6f42a8"
-                                                                : "#a12626",
-                                                fontWeight: "700",
-                                                textTransform: "capitalize",
-                                            }}
-                                        >
-                                            {appointment.status}
-                                        </span>
-                                    </p>
+                                            <input
+                                                type="text"
+                                                name="first_name"
+                                                value={editRealtyForm.first_name}
+                                                onChange={handleRealtyEditChange}
+                                                placeholder="First Name"
+                                            />
 
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            gap: "0.75rem",
-                                            marginTop: "1rem",
-                                            flexWrap: "wrap",
-                                        }}
-                                    >
-                                        {appointment.status !== "confirmed" && (
-                                            <button
-                                                className="btn"
-                                                type="button"
-                                                onClick={() => handleRealtyConfirm(appointment.id)}
+                                            <input
+                                                type="text"
+                                                name="last_name"
+                                                value={editRealtyForm.last_name}
+                                                onChange={handleRealtyEditChange}
+                                                placeholder="Last Name"
+                                            />
+
+                                            <input
+                                                type="text"
+                                                name="phone"
+                                                value={editRealtyForm.phone}
+                                                onChange={handleRealtyEditChange}
+                                                placeholder="Phone"
+                                            />
+
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value={editRealtyForm.email}
+                                                onChange={handleRealtyEditChange}
+                                                placeholder="Email"
+                                            />
+
+                                            <select
+                                                name="service"
+                                                value={editRealtyForm.service}
+                                                onChange={handleRealtyEditChange}
                                             >
-                                                Confirm Realty
-                                            </button>
-                                        )}
+                                                <option value="">Select Service</option>
+                                                <option value="Buying">Buying</option>
+                                                <option value="Selling">Selling</option>
+                                                <option value="Renting">Renting</option>
+                                                <option value="Consultation">Consultation</option>
+                                            </select>
 
-                                        {appointment.status !== "cancelled" && (
-                                            <button
-                                                className="btn"
-                                                type="button"
-                                                onClick={() => handleRealtyCancel(appointment.id)}
+                                            <input
+                                                type="date"
+                                                name="appointment_date"
+                                                value={editRealtyForm.appointment_date}
+                                                onChange={handleRealtyEditChange}
+                                            />
+
+                                            <select
+                                                name="appointment_time"
+                                                value={editRealtyForm.appointment_time}
+                                                onChange={handleRealtyEditChange}
                                             >
-                                                Cancel Realty
-                                            </button>
-                                        )}
+                                                <option value="">Select Time</option>
+                                                {timeOptions.map(time => (
+                                                    <option key={time} value={time}>
+                                                        {time}
+                                                    </option>
+                                                ))}
+                                            </select>
 
-                                        {appointment.status !== "archived" && (
-                                            <button
-                                                className="btn"
-                                                type="button"
-                                                onClick={() => handleRealtyArchive(appointment.id)}
+                                            <textarea
+                                                name="message"
+                                                value={editRealtyForm.message}
+                                                onChange={handleRealtyEditChange}
+                                                placeholder="Message"
+                                            />
+
+                                            <select
+                                                name="status"
+                                                value={editRealtyForm.status}
+                                                onChange={handleRealtyEditChange}
                                             >
-                                                Archive Realty
-                                            </button>
-                                        )}
+                                                <option value="pending">Pending</option>
+                                                <option value="confirmed">Confirmed</option>
+                                                <option value="cancelled">Cancelled</option>
+                                                <option value="archived">Archived</option>
+                                            </select>
 
-                                        <button
-                                            className="btn"
-                                            type="button"
-                                            onClick={() => handleRealtyDelete(appointment.id)}
-                                        >
-                                            Delete Realty
-                                        </button>
-                                    </div>
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    gap: "0.75rem",
+                                                    marginTop: "1rem",
+                                                    flexWrap: "wrap",
+                                                }}
+                                            >
+                                                <button
+                                                    className="btn"
+                                                    type="button"
+                                                    onClick={() => handleRealtyUpdate(appointment.id)}
+                                                >
+                                                    Save Changes
+                                                </button>
+
+                                                <button
+                                                    className="btn"
+                                                    type="button"
+                                                    onClick={cancelRealtyEdit}
+                                                >
+                                                    Cancel Edit
+                                                </button>
+                                            </div>
+                                        </>
+
+                                    ) : (
+                                        <>
+                                            <h3>
+                                                {appointment.first_name} {appointment.last_name}
+                                            </h3>
+
+                                            <p><strong>Service:</strong> {appointment.service}</p>
+                                            <p><strong>Date:</strong> {formatDate(appointment.appointment_date)}</p>
+                                            <p><strong>Phone:</strong> {appointment.phone}</p>
+                                            <p><strong>Email:</strong> {appointment.email}</p>
+                                            <p><strong>Message:</strong> {appointment.message || "None"}</p>
+                                            <p><strong>Time:</strong> {appointment.appointment_time}</p>
+
+
+                                            <p>
+                                                <strong>Status:</strong>{" "}
+                                                <span
+                                                    style={{
+                                                        color:
+                                                            appointment.status === "pending"
+                                                                ? "#7a5a14"
+                                                                : appointment.status === "confirmed"
+                                                                    ? "#1d7e75"
+                                                                    : appointment.status === "archived"
+                                                                        ? "#6f42a8"
+                                                                        : "#a12626",
+                                                        fontWeight: "700",
+                                                        textTransform: "capitalize",
+                                                    }}
+                                                >
+                                                    {appointment.status}
+                                                </span>
+                                            </p>
+
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    gap: "0.75rem",
+                                                    marginTop: "1rem",
+                                                    flexWrap: "wrap",
+                                                }}
+                                            >
+                                                <button
+                                                    className="btn"
+                                                    type="button"
+                                                    onClick={() => startRealtyEdit(appointment)}
+                                                >
+                                                    Edit Realty
+                                                </button>
+
+                                                {appointment.status !== "confirmed" && (
+                                                    <button
+                                                        className="btn"
+                                                        type="button"
+                                                        onClick={() => handleRealtyConfirm(appointment.id)}
+                                                    >
+                                                        Confirm Realty
+                                                    </button>
+                                                )}
+
+                                                {appointment.status !== "cancelled" && (
+                                                    <button
+                                                        className="btn"
+                                                        type="button"
+                                                        onClick={() => handleRealtyCancel(appointment.id)}
+                                                    >
+                                                        Cancel Realty
+                                                    </button>
+                                                )}
+
+                                                {appointment.status !== "archived" && (
+                                                    <button
+                                                        className="btn"
+                                                        type="button"
+                                                        onClick={() => handleRealtyArchive(appointment.id)}
+                                                    >
+                                                        Archive Realty
+                                                    </button>
+                                                )}
+
+                                                <button
+                                                    className="btn"
+                                                    type="button"
+                                                    onClick={() => handleRealtyDelete(appointment.id)}
+                                                >
+                                                    Delete Realty
+                                                </button>
+
+                                                <a
+                                                    className="btn"
+                                                    href={getRealtyGoogleCalendarLink(appointment)}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    Add to Google Calendar
+                                                </a>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ))
+
                         )}
 
                     </div>

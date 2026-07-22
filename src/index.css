@@ -1086,6 +1086,19 @@ h2.h2-sub {
 .service-content li {
   margin-bottom: 10px;
 }
+
+#payment {
+  scroll-margin-top: 140px;
+}
+html {
+  scroll-behavior: smooth;
+}
+
+#payment {
+  scroll-margin-top: 140px;
+}
+
+
 @media (max-width: 900px) {
   .card-grid {
     grid-template-columns: 1fr 1fr;

@@ -54,7 +54,7 @@ function TopBar() {
           <div className="social-icons">
 
             <a
-              href="https://wa.me/19733272340"
+              href="https://wa.me/18627661725"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="WhatsApp"

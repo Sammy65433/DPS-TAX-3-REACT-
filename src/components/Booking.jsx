@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 function generateTimeOptions(selectedDate) {
   if (!selectedDate) return [];
@@ -42,8 +43,22 @@ function Booking() {
   const [bookedTimes, setBookedTimes] = useState([]);
   const [status, setStatus] = useState({ message: "", type: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const location = useLocation();
+
 
   const timeOptions = generateTimeOptions(formData.appointment_date);
+  
+  useEffect(() => {
+  if (location.hash === "#payment") {
+    const el = document.getElementById("payment");
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }
+}, [location]);
+
 
   useEffect(() => {
     async function fetchAvailability() {
@@ -300,7 +315,7 @@ function Booking() {
               </p>
             )}
 
-          <div className="card payment-card" id="payment">
+          <section className="card payment-card" id="payment">
             <h3>Payment Options</h3>
             <p>Please include your last name and tax year in the payment note.</p>
             <p>
@@ -332,7 +347,7 @@ function Booking() {
             <p>
               Phone: <a href="tel:9733272340">(973) 327-2340</a>
             </p>
-          </div>
+          </section>
 
           <textarea
             name="message"
